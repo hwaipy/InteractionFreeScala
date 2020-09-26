@@ -4,6 +4,7 @@ import java.math.BigInteger
 import org.scalatest.BeforeAndAfter
 import org.scalatest.funsuite.AnyFunSuite
 
+class InvocationTest extends AnyFunSuite with BeforeAndAfter {
   val sampleRequestContent = Map[String, Any](
     Invocation.KeyType -> Invocation.ValueTypeRequest,
     Invocation.KeyFunciton -> "FunctionName",
