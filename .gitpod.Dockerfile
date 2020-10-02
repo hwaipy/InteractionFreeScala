@@ -59,10 +59,3 @@ RUN \
   
 # Install IFServer
 RUN pip3 install interactionfreepy
-  
-RUN mkdir /scala
-COPY ./start.sh /scala/start.sh
-
-WORKDIR /scala
-
-CMD ["sh", "start.sh"]
