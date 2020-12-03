@@ -23,7 +23,12 @@ class IFWorkerTest extends AnyFunSuite with BeforeAndAfter {
     assert(m1Invocation.isRequest)
     assert(m1Invocation.getFunction == "fun1")
     assert(m1Invocation.getArguments == List(1, 2, "3"))
-    assert(m1Invocation.getKeywordArguments == Map("b" -> None, "c" -> List(1, 2, "3d")))
+    assert(
+      m1Invocation.getKeywordArguments == Map(
+        "b" -> None,
+        "c" -> List(1, 2, "3d")
+      )
+    )
     val invoker2 = worker.toMessageInvoker("OnT")
     val m2 = invoker2.fun2()
     val m2Invocation = m2.invocation
@@ -44,21 +49,28 @@ class IFWorkerTest extends AnyFunSuite with BeforeAndAfter {
       Await.result(future1, 10 seconds)
       throw new RuntimeException
     } catch {
-      case e: IFException => assert(e.getMessage == "Function [co] not available.")
+      case e: IFException =>
+        assert(e.getMessage == "Function [co] not available.")
     }
     val future2 = invoker1.protocol(a = 1, b = 2)
     try {
       Await.result(future2, 1 seconds)
       throw new RuntimeException
     } catch {
-      case e: IFException => assert(e.getMessage == "Keyword Argument [a] not availabel for function [protocol].")
+      case e: IFException =>
+        assert(
+          e.getMessage == "Keyword Argument [a] not availabel for function [protocol]."
+        )
     }
     val future3 = invoker1.protocol(1, 2, 3)
     try {
       Await.result(future3, 1 seconds)
       throw new RuntimeException
     } catch {
-      case e: IFException => assert(e.getMessage == "Function [protocol] expects [0] arguments, but [3] were given.")
+      case e: IFException =>
+        assert(
+          e.getMessage == "Function [protocol] expects [0] arguments, but [3] were given."
+        )
     }
     val future4 = invoker1.protocol()
     assert(Await.result(future4, 1 seconds) == "IF1")
@@ -72,7 +84,8 @@ class IFWorkerTest extends AnyFunSuite with BeforeAndAfter {
       invoker.co()
       throw new RuntimeException
     } catch {
-      case e: IFException => assert(e.getMessage == "Function [co] not available.")
+      case e: IFException =>
+        assert(e.getMessage == "Function [co] not available.")
     }
     assert(invoker.protocol() == "IF1")
     worker.close()
@@ -84,7 +97,8 @@ class IFWorkerTest extends AnyFunSuite with BeforeAndAfter {
       workerB.co()
       throw new RuntimeException
     } catch {
-      case e: IFException => assert(e.getMessage == "Function [co] not available.")
+      case e: IFException =>
+        assert(e.getMessage == "Function [co] not available.")
     }
     assert(workerB.protocol() == "IF1")
     val workerA = IFWorker.async(brokerAddress)
@@ -93,7 +107,10 @@ class IFWorkerTest extends AnyFunSuite with BeforeAndAfter {
       Await.result(future1, 1 seconds)
       throw new RuntimeException
     } catch {
-      case e: IFException => assert(e.getMessage == "Function [protocol] expects [0] arguments, but [3] were given.")
+      case e: IFException =>
+        assert(
+          e.getMessage == "Function [protocol] expects [0] arguments, but [3] were given."
+        )
     }
     workerB.close()
     workerA.close()
@@ -109,7 +126,11 @@ class IFWorkerTest extends AnyFunSuite with BeforeAndAfter {
 
       def v(i: Int, b: Boolean) = "OK"
     }
-    val worker1 = IFWorker(brokerAddress, serviceObject = new Target(), serviceName = "T1_Benz")
+    val worker1 = IFWorker(
+      brokerAddress,
+      serviceObject = new Target(),
+      serviceName = "T1_Benz"
+    )
     val checker = IFWorker(brokerAddress, timeout = 1 second)
     Thread.sleep(1000)
     try {
@@ -119,24 +140,28 @@ class IFWorkerTest extends AnyFunSuite with BeforeAndAfter {
         benzChecker.v9()
         assert(false)
       } catch {
-        case e: IFException => assert(e.getMessage == "Failed to invoke v9: V9 not good.")
+        case e: IFException =>
+          assert(e.getMessage == "Failed to invoke v9: V9 not good.")
       }
       try {
         benzChecker.v10()
         assert(false)
       } catch {
-        case e: IFException => assert(e.getMessage == "Failed to invoke v10: java.lang.RuntimeException: V10 have problems.")
+        case e: IFException =>
+          assert(
+            e.getMessage == "Failed to invoke v10: java.lang.RuntimeException: V10 have problems."
+          )
       }
       assert(benzChecker.v(1, false) == "OK")
       try {
         benzChecker.v11()
         assert(false)
       } catch {
-        case e: IFException => assert(e.getMessage == "Function not valid: v11.")
+        case e: IFException =>
+          assert(e.getMessage == "Function not valid: v11.")
       }
       assert(benzChecker.notFunction == 100)
-    }
-    finally {
+    } finally {
       worker1.close()
       checker.close()
     }
@@ -149,8 +174,32 @@ class IFWorkerTest extends AnyFunSuite with BeforeAndAfter {
 //      val worker2 = IFWorker(brokerAddress, serviceName = "T2-ClientDuplicated")
 //      assert(false)
     } catch {
-      case e: IFException => assert(e.getMessage == "Service name [T2-ClientDuplicated] occupied.")
+      case e: IFException =>
+        assert(e.getMessage == "Service name [T2-ClientDuplicated] occupied.")
     }
     worker1.close()
   }
+
+  test("Test StopService.") {
+    val serviceName = "DSWorker1"
+    val s1 = IFWorker(brokerAddress, serviceName = serviceName)
+    val client = IFWorker(brokerAddress)
+    Thread.sleep(1000)
+    assert(client.listServiceNames().asInstanceOf[List[Any]].contains(serviceName))
+    client.blockingInvoker(serviceName).stopService()
+    assert(!client.listServiceNames().asInstanceOf[List[Any]].contains(serviceName))
+    s1.close()
+    client.close()
+  }
 }
+
+//     stopResultQueue = queue.Queue()
+//     async def test():
+//         stopped = await stopFuture
+//         stopResultQueue.put('')
+
+//     IOLoop.current().add_callback(test)
+//     stopResultQueue.get(timeout=10)
+//     self.assertFalse(client.listServiceNames().__contains__(serviceName))
+
+// def tearDown(self):

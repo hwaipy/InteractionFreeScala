@@ -52,7 +52,7 @@ object Message {
   def newFromBrokerMessage(messageID: String, fromAddress: Array[Byte], invocation: Invocation, serialization: String = "Msgpack") = new Message(messageID, false, IFDefinition.DISTRIBUTING_MODE_DIRECT, fromAddress, serialization, invocation)
 }
 
-class Message private(val messageID: String, val isOutgoingMessage: Boolean, val distributingMode: String, val remoteAddress: Array[Byte], val serialization: String, val invocation: Invocation) {
+class Message private (val messageID: String, val isOutgoingMessage: Boolean, val distributingMode: String, val remoteAddress: Array[Byte], val serialization: String, val invocation: Invocation) {
   val protocol = "IF1"
   val isBrokerMessage = isOutgoingMessage && distributingMode == IFDefinition.DISTRIBUTING_MODE_BROKER
   val isServiceMessage = isOutgoingMessage && distributingMode == IFDefinition.DISTRIBUTING_MODE_SERVICE
@@ -250,7 +250,12 @@ class IFWorker(endpoint: String, serviceName: String = "", serviceObject: Any = 
     localInvokingExecutor.submit(new Runnable {
       override def run(): Unit = {
         try {
-          val result = invocation.perform(serviceObject)
+          val result = if ("stopService" == invocation.getFunction) {
+            isService set false
+            asynchronousInvoker().unregister()
+            "Stopped"
+          } else invocation.perform(serviceObject)
+          // val result = invocation.perform(serviceObject)
           send(Message.newDirectMessage(sourcePoint, Invocation.newResponse(msg.messageID, result)))
         } catch {
           case e: Throwable => send(Message.newDirectMessage(sourcePoint, Invocation.newError(msg.messageID, e.getMessage)))
@@ -317,10 +322,12 @@ private class InvokeItem(worker: IFWorker, target: String, functionName: String)
   Logging.debug(("creating II"))
   val argsList: ArrayBuffer[Any] = new ArrayBuffer
   val namedArgsMap: mutable.HashMap[String, Any] = new mutable.HashMap
-  args.foreach(m => m match {
-    case (name, value) if name == null || name.isEmpty => argsList += value
-    case (name, value) => namedArgsMap.put(name, value)
-  })
+  args.foreach(m =>
+    m match {
+      case (name, value) if name == null || name.isEmpty => argsList += value
+      case (name, value)                                 => namedArgsMap.put(name, value)
+    }
+  )
   Logging.debug(("II created"))
   val invocation = Invocation.newRequest(functionName, argsList.toList, namedArgsMap.toMap)
 
@@ -332,16 +339,25 @@ private class InvokeItem(worker: IFWorker, target: String, functionName: String)
 }
 
 object IFWorkerApp extends App {
-  val worker = IFWorker("tcp://172.16.60.199:224", "IFWorkerScalaTest")
-  //  val worker = IFWorker("tcp://127.0.0.1:224", "IFWorkerScalaTest")
-  Logging.info("Begin")
-  val random = new Random()
-  while (true) {
-    Thread.sleep(400)
-    val randomData = Range(0, 3).map(ch => Range(0, 10000).map(_ => random.nextDouble()).toArray).toArray
-    worker.asynchronousInvoker("Storage").append("IFWorkerScalaLongTermTest", randomData, fetchTime = System.currentTimeMillis())
-    //    println(worker.asynchronousInvoker("Storage").listServiceNames())
-    Logging.debug(s"Looped at ${LocalDateTime.now()}")
-  }
-  worker.close()
+  // val worker = IFWorker("tcp://172.16.60.199:224", "IFWorkerScalaTest")
+  // //  val worker = IFWorker("tcp://127.0.0.1:224", "IFWorkerScalaTest")
+  // Logging.info("Begin")
+  // val random = new Random()
+  // while (true) {
+  //   Thread.sleep(400)
+  //   val randomData = Range(0, 3).map(ch => Range(0, 10000).map(_ => random.nextDouble()).toArray).toArray
+  //   worker.asynchronousInvoker("Storage").append("IFWorkerScalaLongTermTest", randomData, fetchTime = System.currentTimeMillis())
+  //   //    println(worker.asynchronousInvoker("Storage").listServiceNames())
+  //   Logging.debug(s"Looped at ${LocalDateTime.now()}")
+  // }
+  // worker.close()
+
+  val brokerAddress = "tcp://172.16.60.200:224"
+  val serviceName = "DSWorker1"
+  val s1 = IFWorker(brokerAddress, serviceName = serviceName, serviceObject = "123")
+  val client = IFWorker(brokerAddress)
+  Thread.sleep(2000)
+  // assert(client.listServiceNames().asInstanceOf[List[Any]].contains(serviceName))
+  println(client.blockingInvoker(serviceName).stopService())
+
 }
